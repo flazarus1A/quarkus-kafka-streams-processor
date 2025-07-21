@@ -17,7 +17,7 @@
  * limitations under the License.
  * #L%
  */
-package io.quarkiverse.kafkastreamsprocessor.sample.stateful;
+package io.quarkiverse.kafkastreamsprocessor.sample.stateful.global;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
@@ -51,24 +51,30 @@ public class PingProcessorTest {
         processor.init(context);
     }
 
-    @Test
-    public void testKeyNotInStore() {
-        sendAndTest("key", "value", "Store initialization OK for key");
-        assertThat(store.get("key"), equalTo("value"));
-    }
-
-    @Test
-    public void testKeyWithPreviousValueInStore() {
-        store.put("key", "oldValue");
-        sendAndTest("key", "newValue", "Previous value for key is oldValue");
-        assertThat(store.get("key"), equalTo("newValue"));
-    }
-
     private void sendAndTest(String key, String message, String expectedMessage) {
         processor.process(new Record<>(key, Ping.newBuilder().setMessage(message).build(), 0L));
         assertThat(context.forwarded(), hasSize(1));
         CapturedForward<?, ?> capturedForward = context.forwarded().get(0);
         assertThat(capturedForward.record().key(), equalTo(key));
         assertThat(((Ping) capturedForward.record().value()).getMessage(), equalTo(expectedMessage));
+    }
+
+    @Test
+    public void processKeyNotInStore() {
+        processor.process(new Record<>("key", Ping.newBuilder().setMessage("value").build(), 0L));
+        assertThat(context.forwarded(), hasSize(1));
+        CapturedForward<?, ?> capturedForward = context.forwarded().get(0);
+        assertThat(capturedForward.record().key(), equalTo("key"));
+        assertThat(((Ping) capturedForward.record().value()).getMessage(), equalTo("Stored value for key is null"));
+    }
+
+    @Test
+    public void processKeyWithExistingValueInStore() {
+        store.put("key", "existingValue");
+        processor.process(new Record<>("key", Ping.newBuilder().setMessage("newValue").build(), 0L));
+        assertThat(context.forwarded(), hasSize(1));
+        CapturedForward<?, ?> capturedForward = context.forwarded().get(0);
+        assertThat(capturedForward.record().key(), equalTo("key"));
+        assertThat(((Ping) capturedForward.record().value()).getMessage(), equalTo("Stored value for key is existingValue"));
     }
 }

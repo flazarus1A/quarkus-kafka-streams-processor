@@ -38,6 +38,7 @@ import io.quarkiverse.kafkastreamsprocessor.impl.configuration.DefaultConfigurat
 import io.quarkiverse.kafkastreamsprocessor.impl.configuration.DefaultTopologySerdesConfiguration;
 import io.quarkiverse.kafkastreamsprocessor.impl.configuration.TopologyConfigurationImpl;
 import io.quarkiverse.kafkastreamsprocessor.impl.configuration.TypeUtils;
+import io.quarkiverse.kafkastreamsprocessor.impl.configuration.store.DefaultGlobalStateStoreProcessor;
 import io.quarkiverse.kafkastreamsprocessor.spi.SinkToTopicMappingBuilder;
 import io.quarkiverse.kafkastreamsprocessor.spi.SourceToTopicsMappingBuilder;
 import io.quarkiverse.kafkastreamsprocessor.spi.properties.KStreamsProcessorConfig;
@@ -191,6 +192,32 @@ public class TopologyProducer {
 
         configuration.getStoreConfigurations()
                 .forEach(storeConfiguration -> topology.addStateStore(storeConfiguration.getStoreBuilder(), PROCESSOR_NAME));
+
+        addGlobalStores(configuration, topology);
         return topology;
     }
+
+    private void addGlobalStores(TopologyConfigurationImpl configuration, Topology topology) {
+        configuration.getGlobalStoreConfigurations()
+                .forEach(config -> {
+                    String storeName = config.getStoreBuilder().name();
+                    String topicName = kStreamsProcessorConfig.globalStores().topics().get(storeName);
+
+                    ProcessorSupplier processorSupplier = config.getGlobalStoreProcessorSupplier();
+                    if (processorSupplier == null) {
+                        // If the processor supplier is not defined, we use the default one
+                        processorSupplier = () -> new DefaultGlobalStateStoreProcessor(storeName);
+                    }
+
+                    topology.addGlobalStore(
+                            config.getStoreBuilder(),
+                            topicName,
+                            config.getKeyDeserializer(),
+                            config.getValueDeserializer(),
+                            topicName,
+                            storeName,
+                            processorSupplier);
+                });
+    }
+
 }

@@ -36,6 +36,11 @@ public interface KStreamsProcessorConfig {
     OutputConfig output();
 
     /**
+     * Global state stores config
+     */
+    GlobalStateStoreConfig globalStores();
+
+    /**
      * Dead letter Queue name
      */
     DlqConfig dlq();
